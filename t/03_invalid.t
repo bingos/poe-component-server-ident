@@ -1,89 +1,67 @@
+use strict;
+use warnings;
 use Test::More tests => 4;
-
+BEGIN { use_ok('POE::Component::Server::Ident') };
 use Socket;
-use POE qw(Wheel::SocketFactory Wheel::ReadWrite);
-use_ok( 'POE::Component::Server::Ident' );
+use POE qw(Filter::Line);
+use Test::POE::Client::TCP;
 
 my $identd = POE::Component::Server::Ident->spawn ( Alias => 'Ident-Server', BindAddr => '127.0.0.1', BindPort => 0, Multiple => 1 );
 
 isa_ok( $identd, 'POE::Component::Server::Ident' );
 
-POE::Session->create
-  ( inline_states =>
-      { _start => \&client_start,
-	_stop  => \&client_stop,
-	_sock_up => \&_sock_up,
-	_sock_failed => \&_sock_failed,
-	_parseline => \&_parseline,
-	identd_request => \&identd_request,
-      },
+POE::Session->create(
+    package_states => [
+	main => [qw(_start _stop identd_request idc_input idc_connected idc_socket_failed)],
+    ],
     heap => { Port1 => 12345, Port2 => 123, UserID => 'bingos', Identd => $identd },
   );
 
 POE::Kernel->run();
 exit;
 
-sub client_start {
+sub _start {
   my ($kernel,$heap) = @_[KERNEL,HEAP];
-
   my ($remoteport,undef) = unpack_sockaddr_in( $heap->{Identd}->getsockname() );
-
   $kernel->call ( 'Ident-Server' => 'register' );
-
-  $heap->{'SocketFactory'} = POE::Wheel::SocketFactory->new (
-				RemoteAddress => '127.0.0.1',
-				RemotePort => $remoteport,
-				SuccessEvent => '_sock_up',
-                                FailureEvent => '_sock_failed',
-				BindAddress => '127.0.0.1'
-                             );
-  undef;
+  $heap->{idc} = Test::POE::Client::TCP->spawn(
+	address   => '127.0.0.1',
+	port	  => $remoteport,
+	localaddr => '127.0.0.1',
+	prefix    => 'idc',
+	filter    => POE::Filter::Line->new( Literal => "\x0D\x0A" ),
+	autoconnect => 1,
+  );
+  return;
 }
 
-sub client_stop {
+sub _stop {
   pass("Client stopped");
-  undef;
+  return;
 }
 
-sub _sock_up {
-  my ($kernel,$heap,$socket) = @_[KERNEL,HEAP,ARG0];
-
-  delete $heap->{'SocketFactory'};
-
-  $heap->{'socket'} = new POE::Wheel::ReadWrite
-  (
-        Handle => $socket,
-        Driver => POE::Driver::SysRW->new(),
-        Filter => POE::Filter::Line->new( Literal => "\x0D\x0A" ),
-        InputEvent => '_parseline',
-        ErrorEvent => '_sock_down',
-   );
-
-  $heap->{'socket'}->put("Garbage");
-  undef;
+sub idc_socket_failed {
+  my ($kernel,$heap) = @_[KERNEL,HEAP];
+  $kernel->call( 'Ident-Server' => 'shutdown' );
+  $heap->{idc}->shutdown();
+  return;
 }
 
-sub _sock_failed {
-  $_[KERNEL]->call ( 'Ident-Server' => 'shutdown' );
-  undef;
+sub idc_connected {
+  my ($kernel,$heap) = @_[KERNEL,HEAP];
+  $heap->{idc}->send_to_server( 'Garbage' );
+  return;
 }
 
-sub _sock_down {
-  my ($kernel, $heap) = @_[KERNEL, HEAP];
-  delete $heap->{'socket'};
-  undef;
-}
-
-sub _parseline {
+sub idc_input {
   my ($kernel,$heap,$input) = @_[KERNEL,HEAP,ARG0];
   ok( $input =~ /INVALID-PORT/, "Got the reply" );
-  #$kernel->post ( 'Ident-Server' => 'unregister' );
   $kernel->post ( 'Ident-Server' => 'shutdown' );
-  delete $heap->{'socket'};
-  undef;
+  $heap->{idc}->shutdown();
+  return;
 }
 
 sub identd_request {
   my ($kernel,$heap,$sender,$peeraddr,$first,$second) = @_[KERNEL,HEAP,SENDER,ARG0,ARG1,ARG2];
-  undef;
+  return;
 }

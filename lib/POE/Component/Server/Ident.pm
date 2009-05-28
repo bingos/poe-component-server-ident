@@ -9,7 +9,7 @@ use Carp;
 use Socket;
 use vars qw($VERSION);
 
-$VERSION = '1.14';
+$VERSION = '1.16';
 
 sub spawn {
   my $package = shift;
@@ -65,7 +65,7 @@ sub _server_close {
   my ($kernel,$self) = @_[KERNEL,OBJECT];
   $kernel->alias_remove( $_ ) for $kernel->alias_list();
   $kernel->refcount_decrement( $self->{session_id}, __PACKAGE__ ) unless $self->{alias};
-  $kernel->call( $_, 'client_timeout' ) for %{ $self->{clients} };
+  $kernel->post( $_, 'client_timeout' ) for %{ $self->{clients} };
   delete $self->{listener};
   $kernel->refcount_decrement( $_, __PACKAGE__ ) for keys %{ $self->{sessions} };
   undef;
@@ -312,7 +312,7 @@ and 'Default' options to spawn().
 
 =over
 
-=item spawn
+=item C<spawn>
 
 Takes a number of arguments: 
 
@@ -337,11 +337,11 @@ Takes a number of arguments:
 
 =over
 
-=item session_id
+=item C<session_id>
 
 Retrieve the component's POE session ID.
 
-=item getsockname
+=item C<getsockname>
 
 Access to the L<POE::Wheel::SocketFactory> method of the underlying listening socket.
 
@@ -353,24 +353,24 @@ The component accepts the following events:
 
 =over
 
-=item register
+=item C<register>
 
 Takes no arguments. This registers your session with the component. The component will then send you 
 'identd_request' events when clients make valid ident requests. See below.
 
-=item unregister
+=item C<unregister>
 
 Takes no arguments. This unregisters your session with the component.
 
-=item ident_server_reply
+=item C<ident_server_reply>
 
 Takes two arguments, the first is the 'opsys' field of the ident response, the second is the 'userid'. 
 
-=item ident_server_error
+=item C<ident_server_error>
 
 Takes one argument, the error to return to the client.
 
-=item shutdown
+=item C<shutdown>
 
 Terminates the component. The listener is closed and all current client connections are disconnected.
 
@@ -382,7 +382,7 @@ The component will send the following events:
 
 =over
 
-=item identd_request
+=item C<identd_request>
 
 Sent by the component to 'registered' sessions when a client makes a valid ident request. ARG0 is
 the IP address of the client, ARG1 and ARG2 are the ports as specified in the ident request. You 
@@ -393,11 +393,11 @@ note, that you send these responses to $_[SENDER] not the kernel alias of the co
 
 =head1 AUTHOR
 
-Chris Williams, E<lt>chris@bingosnet.co.ukE<gt>
+Chris C<BinGOs> Williams, E<lt>chris@bingosnet.co.ukE<gt>
 
 =head1 LICENSE
 
-Copyright (C) Chris Williams
+Copyright E<copy> Chris Williams
 
 This module may be used, modified, and distributed under the same terms as Perl itself. Please see the license that came with your Perl distribution for details.
 
@@ -407,4 +407,4 @@ L<POE>
 
 RFC 1413 L<http://www.faqs.org/rfcs/rfc1413.html>
 
-
+=cut
