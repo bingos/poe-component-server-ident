@@ -1,6 +1,10 @@
 POE::Component::Server::Ident
 =============================
 
+1.16	Thu May 28 13:35:34 BST 2009
+	- Refactored all the tests to use Test::POE::Client::TCP. 
+	- Fixed a race condition in shutdown().
+
 1.14	Tue Jul  1 08:42:49 BST 2008
 	- Added LICENSE information.
 
