@@ -1,5 +1,7 @@
 package POE::Component::Server::Ident;
 
+#ABSTRACT: A POE component that provides non-blocking ident services to your sessions.
+
 use 5.006;
 use strict;
 use warnings;
@@ -7,9 +9,6 @@ use POE qw( Wheel::SocketFactory Wheel::ReadWrite Driver::SysRW
             Filter::Line );
 use Carp;
 use Socket;
-use vars qw($VERSION);
-
-$VERSION = '1.16';
 
 sub spawn {
   my $package = shift;
@@ -51,7 +50,7 @@ sub _server_start {
   $kernel->alias_set( $self->{alias} ) if $self->{alias};
   $kernel->refcount_increment( $self->{session_id}, __PACKAGE__ ) unless $self->{alias};
 
-  $self->{listener} = POE::Wheel::SocketFactory->new ( 
+  $self->{listener} = POE::Wheel::SocketFactory->new (
 			BindPort => $self->{bindport},
 			( $self->{bindaddr} ? (BindAddr => $self->{bindaddr}) : () ),
 			Reuse => 'on',
@@ -79,7 +78,7 @@ sub _accept_new_client {
 	object_states => [
 		$self => { _start => '_client_start',
 			   _stop  => '_client_stop',
-			   map { ( $_ => '_' . $_ ) } qw(client_input client_error client_done client_timeout client_default), 
+			   map { ( $_ => '_' . $_ ) } qw(client_input client_error client_done client_timeout client_default),
 			 },
 		$self => [ qw(ident_server_reply ident_server_error) ],
 	],
@@ -121,11 +120,11 @@ sub unregister {
 sub _client_start {
   my ($kernel,$session,$self,$socket,$peeraddr,$peerport) = @_[KERNEL,SESSION,OBJECT,ARG0,ARG1,ARG2];
   my $session_id = $session->ID();
-  
+
   $self->{clients}->{ $session_id }->{PeerAddr} = $peeraddr;
   $self->{clients}->{ $session_id }->{PeerPort} = $peerport;
 
-  $self->{clients}->{ $session_id }->{readwrite} = 
+  $self->{clients}->{ $session_id }->{readwrite} =
   POE::Wheel::ReadWrite->new(
 	Handle => $socket,
 	Filter => POE::Filter::Line->new( Literal => "\x0D\x0A" ),
@@ -255,11 +254,9 @@ sub _valid_ports {
   return 0;
 }
 
-1;
+qq{Papers, please};
 
-=head1 NAME
-
-POE::Component::Server::Ident - A POE component that provides non-blocking ident services to your sessions.
+=pod
 
 =head1 SYNOPSIS
 
@@ -269,7 +266,7 @@ POE::Component::Server::Ident - A POE component that provides non-blocking ident
 
    POE::Component::Server::Ident->spawn ( Alias => 'Ident-Server' );
 
-   POE::Session->create ( 
+   POE::Session->create (
 	package_states => [
 		'main' => [qw(_start identd_request)],
 	],
@@ -295,16 +292,16 @@ POE::Component::Server::Ident - A POE component that provides non-blocking ident
 
 =head1 DESCRIPTION
 
-POE::Component::Server::Ident is a L<POE> component that provides 
+POE::Component::Server::Ident is a L<POE> component that provides
 a non-blocking Identd for other components and POE sessions.
 
 Spawn the component, give it an an optional lias and it will sit there waiting for Ident clients to connect.
 Register with the component to receive ident events. The component will listen for client connections.
-A valid ident request made by a client will result in an 'identd_server' event being sent to your 
+A valid ident request made by a client will result in an 'identd_server' event being sent to your
 session. You may send back 'ident_server_reply' or 'ident_server_error' depending on what the client
 sent.
 
-The component will automatically respond to the client requests with 'ERROR : HIDDEN-USER' if your 
+The component will automatically respond to the client requests with 'ERROR : HIDDEN-USER' if your
 sessions do not send a respond within a 10 second timeout period. This can be adjusted with 'Random'
 and 'Default' options to spawn().
 
@@ -314,22 +311,22 @@ and 'Default' options to spawn().
 
 =item C<spawn>
 
-Takes a number of arguments: 
+Takes a number of arguments:
 
-  'Alias',    a kernel alias to address the component with; 
-  'BindAddr', the IP address that the component should bind to, 
+  'Alias',    a kernel alias to address the component with;
+  'BindAddr', the IP address that the component should bind to,
 	      defaults to INADDR_ANY;
   'BindPort', the port that the component will bind to, default is 113;
-  'Multiple', specify whether the component should allow multiple ident queries 
-              from clients by setting this to 1, default is 0 which terminates 
+  'Multiple', specify whether the component should allow multiple ident queries
+              from clients by setting this to 1, default is 0 which terminates
               client connections after a response has been sent;
   'TimeOut',  this is the idle timeout on client connections, default
               is 60 seconds, accepts values between 60 and 180 seconds.
-  'Default',  provide a default userid to return if your sessions don't provide a 
+  'Default',  provide a default userid to return if your sessions don't provide a
               response.
-  'Random',   the component will generate a random userid string if your sessions 
+  'Random',   the component will generate a random userid string if your sessions
 	      don't provide a response.
-  
+
 
 =back
 
@@ -355,7 +352,7 @@ The component accepts the following events:
 
 =item C<register>
 
-Takes no arguments. This registers your session with the component. The component will then send you 
+Takes no arguments. This registers your session with the component. The component will then send you
 'identd_request' events when clients make valid ident requests. See below.
 
 =item C<unregister>
@@ -364,7 +361,7 @@ Takes no arguments. This unregisters your session with the component.
 
 =item C<ident_server_reply>
 
-Takes two arguments, the first is the 'opsys' field of the ident response, the second is the 'userid'. 
+Takes two arguments, the first is the 'opsys' field of the ident response, the second is the 'userid'.
 
 =item C<ident_server_error>
 
@@ -385,21 +382,11 @@ The component will send the following events:
 =item C<identd_request>
 
 Sent by the component to 'registered' sessions when a client makes a valid ident request. ARG0 is
-the IP address of the client, ARG1 and ARG2 are the ports as specified in the ident request. You 
+the IP address of the client, ARG1 and ARG2 are the ports as specified in the ident request. You
 can use the 'ident_server_reply' and 'ident_server_error' to respond to the client appropriately. Please
 note, that you send these responses to $_[SENDER] not the kernel alias of the component.
 
 =back
-
-=head1 AUTHOR
-
-Chris C<BinGOs> Williams, E<lt>chris@bingosnet.co.ukE<gt>
-
-=head1 LICENSE
-
-Copyright E<copy> Chris Williams
-
-This module may be used, modified, and distributed under the same terms as Perl itself. Please see the license that came with your Perl distribution for details.
 
 =head1 SEE ALSO
 
